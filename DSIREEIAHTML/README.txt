@@ -4,4 +4,4 @@ All images were created by Nick Harbeck.
 
 A copy of the Zenodo respository can be found here: 
 The full github repository can be found here: https://github.com/nrharbeck/EnergyPredictionML
-A copy of the Github.io page can be found here: 
+A copy of the Github.io page can be found here: https://nrharbeck.github.io/EnergyPrediction/EnergyPrediction.html
