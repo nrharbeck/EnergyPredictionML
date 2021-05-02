@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Energy Prediction</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+
+  <!--Change highlights on the map, modified from http://bl.ocks.org/michellechandra/0b2ce4923dc9b5809922-->
+  
+  <style type="text/css">
+  /* On mouse hover, lighten state color */
+  path:hover {
+    fill-opacity: .6;
+  }
+
+  /* Style for Custom Tooltip */
+  div.tooltip {   
+    position: absolute;           
+    text-align: center;           
+    width: 180px;                  
+    height: 40px;                 
+    padding: 2px;             
+    font: 12px sans-serif;        
+    background: #e9e9e9;   
+    border: 0px;      
+    border-radius: 8px;           
+    pointer-events: none;         
+  }
+          
+
+  .axis text {
+    font: 10px sans-serif;
+  }
+
+  .axis line, .axis path {
+    fill: none;
+    stroke: rgb(54, 54, 54);
+    shape-rendering: crispEdges;
+  }
+  .trendline {
+		  stroke-width: 2px;
+		  stroke: #69b3a2;
+		}
+  .annotation_desc {
+    font: 9px sans-serif;
+    color: steelblue;
+  }
+  </style>
+<script>
+$(document).ready(function() {  
+  $("#map").show();
+  $("#map2").hide();
+  $("#title1").show();
+  $("#title2").hide();
+});
+</script>
+</head>
+<body>
+  <div class="page-header">
+		<header class="group">
+      <div class="container">
+      <div class="row">
+        <div class="col-sm-6">
+            <div class="logo">
+              <a class="logo--ni" href="https://www.nickharbeck.com/networked-intelligence"><img src="Images/Logo.png" alt="networked-intelligence" width="80px" height = "80px"></a>
+              <a class="logo--nickharbeck" href="https://www.nickharbeck.com">Nick Harbeck</a>
+            </div>
+        </div>
+        <div class="col-sm-6">  
+          <div class="menubar">
+            <ul id="menu" class="flex-container right primary-menu">
+              <li id="menu-item-1" class="selected-menu-item"><a href="EnergyPrediction.html">Home</a></li>
+              <li id="menu-item-4" class="menu-item"><a href="reading.html">Futher Reading</a></li>
+            </ul>
+          </div><!--menubar--> 
+        </div>
+        </div>
+      </div>  
+      </header>
+  </div>
+
+  <div class="container">
+    <div class="jumbotron">
+      <h1>Neural Network Energy Policy Modeling</h1>
+      <h2>An efficacy analysis of state-level <br> energy efficiency and renewable energy (EERE) policies</h2>
+    </div> 
+  </div>
+  <div class="container">
+    <h4>Introduction</h4>
+    <p>Neural networks are powerful computational tools that can generate exceptional performance in predicting non-linear relationships. Within the context of policymaking, neural networks can be developed that calculate relationships between policies and the desired outcome. Many types of neural networks exist, but this page applies a specific type called a multilayer perceptron (MLP) to United States Energy Efficiency and Renewable Energy (EERE) policy at the state level. By applying an MLP to the EERE policy, the network learns the relationship between these policies and a particular state’s electricity generation. This MLP model trains itself using existing data from the North Carolina Clean Energy Technology Center’s <a href="https://www.dsireusa.org/">Database of State Incentives for Renewables & Efficiency</a>  (DSIRE) using the U.S. Energy Information Administration (EIA)’s <a href="https://www.eia.gov/opendata/">Open Data Application Programming Interface</a> (API) to predict how differing energy efficiency and renewable energy policies affect real time energy generation.</p>
+    <p>DSIRE includes a collection of nearly 6,000 state-level EERE policies. The annual net generation data comes from over 13,000 observations collected by EIA.</p>
+    <p>The map below compares the number of EERE policies in each state and the proportion of renewable energy generation in each state.</p>
+  </div>
+  <div class="container">
+  <div class="row">
+    <div class = "col-md-3">
+      <form>
+        <div class="form-group">
+          <label for="sel1" style="font-size: 2em;">Showing</label>
+          <select class="form-control" id="Dropdown">
+            <option value="DSIRE_chart" id="DSIRE_chart">Current Policies</option>
+            <option value="renewable_chart" id="renewable_chart">Renewable Generation</option>
+          </select>
+        </div><!--form-group-->
+      </form>
+    </div><!--col-md-2-->
+    <div class="col-md-7" id="title1">
+          <h2>EERE Policies in Each State</h2>
+          <p style="text-align: center;">Darker colors indicate more policies</p>
+    </div><!--col-md-8-->
+    <div class="col-md-8" id="title2">
+      <h2>2020 Renewable Energy Generation <br> (Percent of Total Generation)</h2>
+      <p style="text-align: center;">Darker colors indicate more generation</p>
+  </div><!--col-md-8-->
+    
+    <div id="map" style="text-align: center;"></div>
+    <div id="map2" style="text-align: center;"></div>
+
+<script type="text/javascript">
+
+//map modified from https://bl.ocks.org/wboykinm/dbbe50d1023f90d4e241712395c27fb3
+//Width and height of map
+var width = 900;
+var height = 600;
+
+var lowColor = '#8CD2E8'
+var highColor = '#1E3F66'
+
+// D3 Projection
+var projection = d3.geoAlbersUsa()
+  .translate([width / 2, height / 2]) // translate to center of screen
+  .scale([1000]); // scale things down so see entire US
+
+// Define path generator
+var path = d3.geoPath() // path generator that will convert GeoJSON to SVG paths
+  .projection(projection); // tell path generator to use albersUsa projection
+
+//Create SVG element and append map to the SVG
+var svg = d3.select("#map")
+  .append("svg")
+  .attr("width", width)
+  .attr("height", height);
+
+//Add tooltip variable div
+// Append Div for tooltip to SVG
+var div = d3.select("#map")
+		    .append("div")   
+    		.attr("class", "tooltip")               
+    		.style("opacity", 0);
+
+// Load in data
+d3.csv("Data/stateCount2020.csv", function(data) {
+	var dataArray = [];
+	for (var d = 0; d < data.length; d++) {
+		dataArray.push(parseFloat(data[d].counts))
+	}
+	var minVal = d3.min(dataArray)
+	var maxVal = d3.max(dataArray)
+	var ramp = d3.scaleLinear().domain([minVal,maxVal]).range([lowColor,highColor])
+	
+  // Load GeoJSON data and merge with states data
+  d3.json("us-states.json", function(json) {
+
+    // Loop through each state data value in the .csv file
+    for (var i = 0; i < data.length; i++) {
+
+      // Grab State Name
+      var dataState = data[i].state_id;
+
+      // Grab data value 
+      var dataValue = data[i].counts;
+
+      // Find the corresponding state inside the GeoJSON
+      for (var j = 0; j < json.features.length; j++) {
+        var jsonState = json.features[j].properties.name;
+
+        if (dataState == jsonState) {
+
+          // Copy the data value into the JSON
+          json.features[j].properties.counts = dataValue;
+
+          // Stop looking through the JSON
+          break;
+        }
+      }
+    }
+
+    // Bind the data to the SVG and create one path per GeoJSON feature
+    svg.selectAll("path")
+      .data(json.features)
+      .enter()
+      .append("path")
+      .attr("d", path)
+      // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
+      // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+      .on("mouseover", function(d) {      
+          div.transition()        
+              .duration(200)      
+              .style("opacity", .9);      
+          var tooltip_text = d.properties.name + "<br>" + d.properties.counts + " policies"    
+          div.html(tooltip_text)
+              .style("left", (d3.event.pageX) + "px")     
+              .style("top", (d3.event.pageY - 20) + "px");   
+      })   
+
+        // fade out tooltip on mouse out               
+        .on("mouseout", function(d) {       
+            div.transition()        
+              .duration(500)      
+              .style("opacity", 0);   
+        })
+      .style("stroke", "#fff")
+      .style("stroke-width", "1")
+      .style("fill", function(d) { return ramp(d.properties.counts)})
+    });
+  });
+</script>
+<!--Start of JS for ACEEE rankings-->
+<script type="text/javascript">
+  //map modified from https://bl.ocks.org/wboykinm/dbbe50d1023f90d4e241712395c27fb3
+  //Width and height of map
+  var width2 = 900;
+  var height2 = 600;
+  
+  var lowColor2 = '#ACDF87'
+  var highColor2 = '#1E5631'
+  
+  // D3 Projection
+  var projection2 = d3.geoAlbersUsa()
+    .translate([width2 / 2, height2 / 2]) // translate to center of screen
+    .scale([1000]); // scale things down so see entire US
+  
+  // Define path generator
+  var path2 = d3.geoPath() // path generator that will convert GeoJSON to SVG paths
+    .projection(projection2); // tell path generator to use albersUsa projection
+  
+  //Create SVG element and append map to the SVG
+  var svg2 = d3.select("#map2")
+    .append("svg")
+    .attr("width", width2)
+    .attr("height", height2);
+  
+  //Add tooltip variable div
+  // Append Div for tooltip to SVG
+  var div2 = d3.select("#map2")
+          .append("div")   
+          .attr("class", "tooltip")               
+          .style("opacity", 0);
+  
+  // Load in data
+  d3.csv("Data/Annual_Generation_Sums.csv", function(data2) {
+    var dataArray2 = [];
+    for (var d = 0; d < data2.length; d++) {
+      dataArray2.push(parseFloat(data2[d].Renewable_pct))
+    }
+    var minVal2 = d3.min(dataArray2)
+    var maxVal2 = d3.max(dataArray2)
+    var ramp2 = d3.scaleLinear().domain([minVal2,maxVal2]).range([lowColor2,highColor2])
+    
+    // Load GeoJSON data and merge with states data
+    d3.json("us-states.json", function(json2) {
+  
+      // Loop through each state data value in the .csv file
+      for (var i = 0; i < data2.length; i++) {
+  
+        // Grab State Name
+        var dataState2 = data2[i].State;
+  
+        // Grab Renewable % 
+        var dataValue2 = data2[i].Renewable_pct;
+
+  
+        // Find the corresponding state inside the GeoJSON
+        for (var j = 0; j < json2.features.length; j++) {
+          var jsonState2 = json2.features[j].properties.name;
+  
+          if (dataState2 == jsonState2) {
+  
+            // Copy the data value into the JSON
+            json2.features[j].properties.Renewable_pct = dataValue2;
+  
+            // Stop looking through the JSON
+            break;
+          }
+        }
+      }
+  
+      // Bind the data to the SVG and create one path per GeoJSON feature
+      svg2.selectAll("path2")
+        .data(json2.features)
+        .enter()
+        .append("path")
+        .attr("d", path2)
+        // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
+        // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+        .on("mouseover", function(d) {      
+            div2.transition()        
+                .duration(200)      
+                .style("opacity", .9);      
+            var tooltip_text2 = d.properties.name + "<br>" + "Renewable Generation: " + Math.round(d.properties.Renewable_pct,1) + "%"
+            div2.html(tooltip_text2)
+                .style("left", (d3.event.pageX) + "px")     
+                .style("top", (d3.event.pageY - 20) + "px");   
+        })   
+  
+          // fade out tooltip on mouse out               
+          .on("mouseout", function(d) {       
+              div2.transition()        
+                .duration(500)      
+                .style("opacity", 0);   
+          })
+        .style("stroke", "#fff")
+        .style("stroke-width", "1")
+        .style("fill", function(d) { return ramp2(d.properties.Renewable_pct)})
+    });
+  });
+  
+  </script>
+  </div>
+  <div class="container" style="text-align: center;">
+    <div class="col-md-12">
+        <h2>Below, a neural network can be used to predict whether energy generation will increase if a state introduces new energy efficiency or renewable energy polices.</h2>
+        <p style="text-align: left;">
+          MLPs are a class of machine learning algorithms that can solve classification problems of arbitrary complexity (<a href="https://hagan.okstate.edu/nnd.html">Hagan et. al, 2014</a>). The popularized MLP algorithm generates weights in a matrix that apply to each input, called features, through a combination of matrix multiplication steps. One way to think of a feature in tabular data is as a column, i.e., a column containing the year of each observation. Each of these multiplication steps send the calculation to a transfer function that coerces the data into a uniform output (Hagan et. al, 2014). This entire process occurs within an MLP layer and each calculation is commonly called a neuron. An MLP can have an arbitrary number of these neurons within each layer and an arbitrary number of layers. The graphic below summarizes the MLP process.
+        </p>
+        <img src="Images/MLP_Diagram.png" alt="Diagram" width="700">
+        <h3 style="text-align: left;">Change the inputs to predict a policy outcome within the context of the state's existing policies</h3>
+        <br>
+      </div>
+  </div>
+
+
+<div class="form-group form-inline" style="text-align: center;">
+  <label for="state">How will one new 
+    <div class="input-group">
+    <select id="policy_tech" name="policy" class="form-control">
+      <option value="Solar_policy">Solar</option>
+      <option value="Geothermal_policy">Geothermal</option>
+      <option value="Wind_policy">Wind</option>
+      <option value="Biomass_policy">Biomass</option>
+      <option value="Hydroelectric_policy">Hydro</option>
+    </select>
+    </div>
+  </label>
+  <label for="state">
+    <div class="input-group">
+    <select id="policy_type" name="policy" class="form-control">
+      <option value="_Financial Incentive">Financial Incentive</option>
+      <option value="_Regulatory Policy">Regulatory</option>
+    </select>
+    </div>
+    policy
+  </label>
+
+  <label for="state">in
+    <div class="input-group">
+    <select id="state_selector" name="state" class="form-control">
+      <option value="State_Alabama">Alabama</option>
+      <option value="State_Alaska">Alaska</option>
+      <option value="State_Arizona">Arizona</option>
+      <option value="State_Arkansas">Arkansas</option>
+      <option value="State_California">California</option>
+      <option value="State_Colorado">Colorado</option>
+      <option value="State_Connecticut">Connecticut</option>
+      <option value="State_Delaware">Delaware</option>
+      <option value="State_Florida">Florida</option>
+      <option value="State_Georgia">Georgia</option>
+      <option value="State_Hawaii">Hawaii</option>
+      <option value="State_Idaho">Idaho</option>
+      <option value="State_Illinois">Illinois</option>
+      <option value="State_Indiana">Indiana</option>
+      <option value="State_Iowa">Iowa</option>
+      <option value="State_Kansas">Kansas</option>
+      <option value="State_Kentucky">Kentucky</option>
+      <option value="State_Louisiana">Louisiana</option>
+      <option value="State_Maine">Maine</option>
+      <option value="State_Maryland">Maryland</option>
+      <option value="State_Massachusetts">Massachusetts</option>
+      <option value="State_Michigan">Michigan</option>
+      <option value="State_Minnesota">Minnesota</option>
+      <option value="State_Mississippi">Mississippi</option>
+      <option value="State_Missouri">Missouri</option>
+      <option value="State_Montana">Montana</option>
+      <option value="State_Nebraska">Nebraska</option>
+      <option value="State_Nevada">Nevada</option>
+      <option value="State_New Hampshire">New Hampshire</option>
+      <option value="State_New Jersey">New Jersey</option>
+      <option value="State_New Mexico">New Mexico</option>
+      <option value="State_New York">New York</option>
+      <option value="State_North Carolina">North Carolina</option>
+      <option value="State_North Dakota">North Dakota</option>
+      <option value="State_Ohio">Ohio</option>
+      <option value="State_Oklahoma">Oklahoma</option>
+      <option value="State_Oregon">Oregon</option>
+      <option value="State_Pennsylvania">Pennsylvania</option>
+      <option value="State_Rhode Island">Rhode Island</option>
+      <option value="State_South Carolina">South Carolina</option>
+      <option value="State_South Dakota">South Dakota</option>
+      <option value="State_Tennessee">Tennessee</option>
+      <option value="State_Texas">Texas</option>
+      <option value="State_Utah">Utah</option>
+      <option value="State_Vermont">Vermont</option>
+      <option value="State_Virginia">Virginia</option>
+      <option value="State_Washington">Washington</option>
+      <option value="State_West Virginia">West Virginia</option>
+      <option value="State_Wisconsin">Wisconsin</option>
+      <option value="State_Wyoming">Wyoming</option>
+    </select>
+    </div>
+  </label>
+
+  <label for="state">likely affect
+    <div class="input-group">
+    <select id="energy_selector" name="energy" class="form-control">
+      <option value="generation_energy_COW">Coal</option>
+      <option value="generation_energy_PEL">Liquified Petroleum</option>
+      <option value="generation_energy_PC">Petroleum Coke</option>
+      <option value="generation_energy_NG">Natural Gas</option>
+      <option value="generation_energy_OOG">Other Gas</option>
+      <option value="generation_energy_NUC">Nuclear</option>
+      <option value="generation_energy_HYC">Hydro</option>
+      <option value="generation_energy_WND">Wind</option>
+      <option value="generation_energy_SUN">Solar</option>
+      <option value="generation_energy_SPV">Photovoltaic</option>
+      <option value="generation_energy_STH">Thermal</option>
+      <option value="generation_energy_GEO">Geothermal</option>
+      <option value="generation_energy_WWW">Wood</option>
+      <option value="generation_energy_WAS">Biomass</option>
+      <option value="generation_energy_HPS">HydroElectric</option>
+      <option value="generation_energy_AOR">Other Renewables</option>
+    </select>
+    </div>
+    generation?
+  </label>
+  <br>
+  <button type="button" onclick="PredictEnergyConsumption()" class="btn btn-primary">Predict</button>
+  <br>
+</div>
+<div id="tensorflow" style="text-align: center; font-weight: bold"></div>
+
+</div>
+  </div>
+    <div class="container">
+      <div id="datasources">
+        <p>EERE policy data comes from <a href="https://www.dsireusa.org/">DSIRE</a> and the <a href="https://www.eia.gov/opendata/">EIA</a>. More information can be found on each organization's respective website.</p>
+      </div>
+  </div>
+  </div>
+<script>
+async function PredictEnergyConsumption() {
+  //These are the most recent observations of energy generation in each state. Loading guide from https://stackoverflow.com/questions/53532433/how-to-train-a-tensorflow-js-model-using-a-csv-file/53730094 
+d3.csv("/DSIREEIAHTML/Data/modelinput.csv", function(data) { 
+  var state_input = document.getElementById('state_selector').value
+  var energy_input = document.getElementById('energy_selector').value
+  var csvDataset = data.filter(function(d) { return d[state_input] == 1 && d[energy_input] == 1 });
+  var mappedArray = d3.entries(csvDataset[0]);
+
+  var policy_tech = document.getElementById('policy_tech')
+  var policy_type = document.getElementById('policy_type')
+
+
+  //convert to values for input into tensorflow model
+  var ModelInput = {};
+  for (var i = 0; i < mappedArray.length; i++) {
+    ModelInput[mappedArray[i].key] = parseInt(mappedArray[i].value);
+  }
+  //console.log("Raw Model Input (No user policy additions)", ModelInput)
+
+  // Update with new types of policies
+  if(policy_tech[0].selected){ 
+    ModelInput["Solar - Passive"+policy_type.value] += 1; 
+    ModelInput["Solar Water Heat"+policy_type.value] += 1;
+    ModelInput["Solar Space Heat"+policy_type.value] += 1;
+    ModelInput["Solar Photovoltaics"+policy_type.value] += 1;
+    ModelInput["Solar Thermal Electric"+policy_type.value] += 1;
+    ModelInput["Solar Thermal Process Heat"+policy_type.value] += 1; 
+    ModelInput["Solar Pool Heating"+policy_type.value] += 1;     
+}
+
+  if(policy_tech[1].selected){ 
+    ModelInput["Geothermal Electric"+policy_type.value] += 1; 
+    ModelInput["Geothermal Heat Pumps"+policy_type.value] += 1;
+    ModelInput["Geothermal Direct-Use"+policy_type.value] += 1;
+}
+
+  if(policy_tech[2].selected){ 
+    ModelInput["Wind (All)"+policy_type.value] += 1; 
+    ModelInput["Wind (Small)"+policy_type.value] += 1;
+    ModelInput["Offshore Wind"+policy_type.value] += 1;
+}
+
+  if(policy_tech[3].selected){ 
+    ModelInput["Biomass"+policy_type.value] += 1; 
+    ModelInput["Municipal Solid Waste"+policy_type.value] += 1;
+}
+
+  if(policy_tech[4].selected){ 
+    ModelInput["Hydroelectric"+policy_type.value] += 1; 
+    ModelInput["Hydroelectric (Small)"+policy_type.value] += 1;
+    ModelInput["Ocean Thermal"+policy_type.value] += 1;  
+}
+
+  //console.log("Updated Model Input",ModelInput)
+
+  //Convert the updated object into an tensor to feed into the model
+  var input_array = Object.keys(ModelInput).map((key) => [ModelInput[key]]);
+  let flattened = [].concat.apply([], input_array);
+
+  var model_input_tensor = tf.tensor2d(flattened, [1,261]);
+
+  // Script for applying the model. Guide from https://www.tensorflow.org/js/tutorials/conversion/import_keras and https://github.com/carlos-aguayo/carlos-aguayo.github.io/blob/master/tfjs.html 
+  //final activation function is logistic so a threshold determines whether generation increases or decreases
+  tf.loadLayersModel('model/model.json').then(function(model) {
+      window.model = model;
+      var prediction = window.model.predict(model_input_tensor);
+      //console.log(energy_input, prediction.arraySync()[0][0]);
+      if(prediction.arraySync()[0][0] > 0.5)
+      document.getElementById("tensorflow").innerHTML
+      = "Predicted Energy Generation: " + "Increases";
+      if(prediction.arraySync()[0][0] < 0.5)
+      document.getElementById("tensorflow").innerHTML
+      = "Predicted Energy Generation: " + "Minimal Change";
+    });
+
+});
+}
+</script>
+</body>
+<footer>
+  <script>
+  //Display the selected map
+    $(document).ready(function(){
+        $('#Dropdown').on('change', function() {
+          if ( this.value == 'DSIRE_chart')
+          {
+            $("#map").fadeIn(1000);
+            $("#title1").fadeIn(1000);
+          }
+          else
+          {
+            $("#map").hide();
+            $("#title1").hide();
+          }
+        });
+    });
+    $(document).ready(function(){
+        $('#Dropdown').on('change', function() {
+          if ( this.value == 'renewable_chart')
+          {
+            $("#map2").fadeIn(1000);
+            $("#title2").fadeIn(1000);
+          }
+          else
+          {
+            $("#map2").hide();
+            $("#title2").hide();
+          }
+        });
+    });
+
+  </script>
+</footer>
+</html>
