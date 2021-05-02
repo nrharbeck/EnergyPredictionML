@@ -2,6 +2,6 @@ The files used to create the website use a combination of Bootstrap, jQuery, D3.
 
 All images were created by Nick Harbeck. 
 
-A copy of the Zenodo respository can be found here: 
+A copy of the Zenodo respository can be found here: https://zenodo.org/record/4733048#.YI7fVqEpBPY
 The full github repository can be found here: https://github.com/nrharbeck/EnergyPredictionML
 A copy of the Github.io page can be found here: https://nrharbeck.github.io/EnergyPrediction/EnergyPrediction.html
