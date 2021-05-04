@@ -7,4 +7,4 @@ Neural networks are powerful computational tools that can generate exceptional p
 
 This project applies an MLP and simple models to DSIRE and EIA data to predict whether net generation, by fuel source, increases year-over-year. The Python Notebook contains model development and data processing and loading can be found in the DataProcessing folder.
 
-The website includes a deployed tensorflow.js model that user can test via inputs. For access, please visit: 
+The website includes a deployed tensorflow.js model that user can test via inputs. For access, please visit: https://nrharbeck.github.io/EnergyPrediction/EnergyPrediction.html
